@@ -39,7 +39,10 @@ def get_client() -> QdrantClient:
 def get_embedder() -> TextEmbedding:
     global _embedder
     if _embedder is None:
-        _embedder = TextEmbedding(model_name=EMBED_MODEL)
+        # threads=1: ONNX Runtime otherwise sizes its thread pool to the host's
+        # core count and allocates a memory arena per thread, which overruns a
+        # small container. One thread is plenty for this batch size.
+        _embedder = TextEmbedding(model_name=EMBED_MODEL, threads=1)
     return _embedder
 
 
@@ -72,7 +75,7 @@ def store_chunks(repo_url: str, chunks: list[Chunk]) -> str:
     )
 
     texts = [chunk_text(c) for c in chunks]
-    vectors = list(get_embedder().embed(texts))
+    vectors = list(get_embedder().embed(texts, batch_size=16))
 
     points = [
         PointStruct(
