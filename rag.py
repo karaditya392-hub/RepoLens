@@ -5,7 +5,7 @@ Needs GROQ_API_KEY in the environment (loaded from .env by app.py).
 
 from groq import Groq
 
-from vectorstore import collection_name, get_client, get_embedder
+from vectorstore import collection_name, env, get_client, get_embedder
 
 MODEL = "llama-3.3-70b-versatile"
 
@@ -25,7 +25,8 @@ _groq: Groq | None = None
 def get_groq() -> Groq:
     global _groq
     if _groq is None:
-        _groq = Groq()  # reads GROQ_API_KEY from the environment
+        # Trim whitespace for the same reason as the Qdrant credentials.
+        _groq = Groq(api_key=env("GROQ_API_KEY") or None)
     return _groq
 
 

@@ -26,12 +26,22 @@ _client: QdrantClient | None = None
 _embedder: TextEmbedding | None = None
 
 
+def env(name: str, default: str = "") -> str:
+    """Read an env var, trimming whitespace.
+
+    Values pasted into a hosting dashboard often pick up a trailing newline,
+    and a credential carrying one is rejected outright as an illegal HTTP
+    header value rather than failing as a bad credential.
+    """
+    return os.environ.get(name, default).strip()
+
+
 def get_client() -> QdrantClient:
     global _client
     if _client is None:
         _client = QdrantClient(
-            url=os.environ.get("QDRANT_URL", "http://localhost:6333"),
-            api_key=os.environ.get("QDRANT_API_KEY") or None,
+            url=env("QDRANT_URL", "http://localhost:6333"),
+            api_key=env("QDRANT_API_KEY") or None,
         )
     return _client
 
