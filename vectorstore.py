@@ -9,6 +9,7 @@ Embeddings are computed locally with fastembed (BAAI/bge-small-en-v1.5,
 once on first use and cached.
 """
 
+import gc
 import os
 import re
 import uuid
@@ -21,6 +22,7 @@ from chunker import Chunk
 
 EMBED_MODEL = "BAAI/bge-small-en-v1.5"
 EMBED_DIM = 384
+UPSERT_BATCH = 64
 
 _client: QdrantClient | None = None
 _embedder: TextEmbedding | None = None
@@ -84,25 +86,31 @@ def store_chunks(repo_url: str, chunks: list[Chunk]) -> str:
         vectors_config=VectorParams(size=EMBED_DIM, distance=Distance.COSINE),
     )
 
-    texts = [chunk_text(c) for c in chunks]
-    vectors = list(get_embedder().embed(texts, batch_size=16))
+    # Embed and upsert a batch at a time. Materialising every vector and point
+    # up front makes peak memory scale with repo size, which a small instance
+    # cannot absorb.
+    embedder = get_embedder()
+    for start in range(0, len(chunks), UPSERT_BATCH):
+        batch = chunks[start : start + UPSERT_BATCH]
+        vectors = embedder.embed([chunk_text(c) for c in batch], batch_size=16)
+        points = [
+            PointStruct(
+                id=str(uuid.uuid5(uuid.NAMESPACE_URL, f"{repo_url}#{c.file_path}#{c.start_line}")),
+                vector=vec.tolist(),
+                payload={
+                    "repo_url": repo_url,
+                    "name": c.name,
+                    "kind": c.kind,
+                    "file_path": c.file_path,
+                    "start_line": c.start_line,
+                    "end_line": c.end_line,
+                    "code": c.code,
+                    "docstring": c.docstring,
+                },
+            )
+            for c, vec in zip(batch, vectors)
+        ]
+        client.upsert(collection_name=name, points=points, wait=True)
 
-    points = [
-        PointStruct(
-            id=str(uuid.uuid5(uuid.NAMESPACE_URL, f"{repo_url}#{c.file_path}#{c.start_line}")),
-            vector=vec.tolist(),
-            payload={
-                "repo_url": repo_url,
-                "name": c.name,
-                "kind": c.kind,
-                "file_path": c.file_path,
-                "start_line": c.start_line,
-                "end_line": c.end_line,
-                "code": c.code,
-                "docstring": c.docstring,
-            },
-        )
-        for c, vec in zip(chunks, vectors)
-    ]
-    client.upsert(collection_name=name, points=points, wait=True)
+    gc.collect()
     return name
