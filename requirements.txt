@@ -1,6 +1,6 @@
-fastapi
-uvicorn[standard]
-qdrant-client
-fastembed
-groq
-python-dotenv
+fastapi==0.139.0
+uvicorn[standard]==0.51.0
+qdrant-client==1.18.0
+fastembed==0.8.0
+groq==1.6.0
+python-dotenv==1.2.2
