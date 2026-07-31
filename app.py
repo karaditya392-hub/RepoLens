@@ -1,7 +1,9 @@
-"""RepoLens Phase 2: FastAPI service exposing repo ingestion.
+"""RepoLens API: index a GitHub repo, then ask grounded questions about it.
 
 Run locally:
     uvicorn app:app --reload --port 8000
+
+Environment (see .env.example): QDRANT_URL, QDRANT_API_KEY, GROQ_API_KEY.
 """
 
 import re
