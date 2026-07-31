@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: repolens-api
+    runtime: docker
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: QDRANT_URL
+        sync: false
+      - key: QDRANT_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
