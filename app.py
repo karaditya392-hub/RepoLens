@@ -78,6 +78,52 @@ def health():
     return {"status": "ok"}
 
 
+@app.get("/debug/env")
+def debug_env():
+    """Report whether config and tooling are present. Never returns secret values."""
+    import os
+    import shutil
+
+    def describe(var: str) -> dict:
+        v = os.environ.get(var)
+        return {"set": bool(v), "length": len(v) if v else 0}
+
+    model_dir = os.environ.get("FASTEMBED_CACHE_PATH", "")
+    return {
+        "qdrant_url": describe("QDRANT_URL"),
+        "qdrant_api_key": describe("QDRANT_API_KEY"),
+        "groq_api_key": describe("GROQ_API_KEY"),
+        "git_on_path": shutil.which("git"),
+        "model_cache_path": model_dir,
+        "model_cache_exists": os.path.isdir(model_dir) if model_dir else False,
+        "model_cache_entries": sorted(os.listdir(model_dir))[:10] if model_dir and os.path.isdir(model_dir) else [],
+    }
+
+
+@app.get("/debug/qdrant")
+def debug_qdrant():
+    """Touch Qdrant only. If this kills the worker, the vector store is the culprit."""
+    from vectorstore import get_client
+
+    try:
+        names = [c.name for c in get_client().get_collections().collections]
+        return {"ok": True, "collections": names}
+    except Exception as e:
+        return {"ok": False, "error": f"{type(e).__name__}: {e}"}
+
+
+@app.get("/debug/embed")
+def debug_embed():
+    """Load the embedding model only. If this kills the worker, ONNX is the culprit."""
+    from vectorstore import get_embedder
+
+    try:
+        vec = list(get_embedder().embed(["hello world"]))[0]
+        return {"ok": True, "dim": len(vec)}
+    except Exception as e:
+        return {"ok": False, "error": f"{type(e).__name__}: {e}"}
+
+
 @app.post("/query", response_model=QueryResponse)
 def query_repo(req: QueryRequest):
     url = req.repo_url.strip().removesuffix(".git")
